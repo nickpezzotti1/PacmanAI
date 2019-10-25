@@ -36,7 +36,7 @@ import game
 import util
 
 import sys
-GHOST_REWARD = -sys.maxint - 1
+GHOST_REWARD = -200 #-sys.maxint - 1
 FOOD_REWARD = 10
 CAPSULE_REWARD = 15
 EMPTY_CELL_REWARD = -1
@@ -134,18 +134,18 @@ class MDPAgent(Agent):
         self._print_map(state)
 
 
-    def _print_map(self, state, print_heuristics=False):
+    def _print_map(self, state, print_heuristics=True):
         myPos =  api.whereAmI(state)
         print("---------------MAP---------------")
         for i in reversed(range(len(self.map))):
             for j in range(len(self.map[i])):
                 if (print_heuristics):
                     if myPos[1] == i and myPos[0] == j:
-                        print "P",
+                        print "P\t",
                     elif self.map[i][j] == WALL_REWARD:
-                        print "|",
+                        print "|\t",
                     else:
-                        print self.map[i][j],
+                        print str(self.map[i][j]) + "\t",
                 else:
                     if myPos[1] == i and myPos[0] == j:
                         print "P",
