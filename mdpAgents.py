@@ -36,86 +36,43 @@ import game
 import util
 
 import sys
-GHOST_REWARD = -200 #-sys.maxint - 1
+GHOST_REWARD = -200
 FOOD_REWARD = 10
-CAPSULE_REWARD = 15
+CAPSULE_REWARD = 10
 EMPTY_CELL_REWARD = -1
 WALL_REWARD = 0
-NO_MOVE_REWARD = -2
+NO_MOVE_REWARD = -1
 
 
-class MDPAgent(Agent):
-    map = None
+class MapRepresentation():
 
-    # Constructor: this gets run when we first invoke pacman.py
-    def __init__(self):
-        print "Starting up MDPAgent!"
-        name = "Pacman"
+    def __init__(self, state):
+        self.update_map(state)
 
-    # Gets run after an MDPAgent object is created and once there is
-    # game state to access.
-    def registerInitialState(self, state):
-        # CREATE A MAP THAT STORES THE UTILITY OF EACH CELL
-        print "Setting up map"
-        self._update_map(state)
-        self._print_map(state)
+    def update_map(self, state):
+        ''' Update the rewards on the map . Called after every move '''
+        self.map = self._get_empty_map(state)
 
-    # This is what gets run in between multiple games
-    def final(self, state):
-        print "Looks like the game just ended!"
+        self.pac_man_pos =  api.whereAmI(state)
+        self._update_rewards(state)
+        self._value_iteration(state)
 
-    # For now I just move randomly
-    def getAction(self, state):
-        print "Updating internal representation of map"
-        self._update_map(state)
+    def _get_empty_map(self, state):
+        ''' Generate an empty 2D-matrix representing the array '''
 
-        # Get the actions we can try, and remove "STOP" if that is one of them.
-        legal_moves = api.legalActions(state)
-        move = self._determine_best_action(state, legal_moves)
-        # Random choice between the legal options.
-        return api.makeMove(move, legal_moves)
-
-    def _determine_best_action(self, state, legal_moves):
-        calculate_utility = lambda state : lambda move : self._get_move_utility(state, move)
-        heuristic_of_moves = map(calculate_utility(state), legal_moves)
-        print(heuristic_of_moves)
-
-
-        best_move_index = 0
-        for i in range(len(heuristic_of_moves)):
-            if heuristic_of_moves[best_move_index] < heuristic_of_moves[i]:
-                best_move_index = i
-
-        return legal_moves[best_move_index]
-
-    #TODO put non determinism in
-    def _get_move_utility(self, state, direction):
-        myPos =  api.whereAmI(state)
-        if direction == "Stop":
-            return self.map[myPos[1]][myPos[0]]
-        elif direction == "North":
-            return self.map[myPos[1] + 1][myPos[0]]
-        elif direction == "East":
-            return self.map[myPos[1]][myPos[0] + 1]
-        elif direction == "South":
-            return self.map[myPos[1] - 1][myPos[0]]
-        elif direction == "West":
-            return self.map[myPos[1]][myPos[0] - 1]
-
-
-    def _reset_map(self, state):
         corners = api.corners(state)
+
         max_row = 0
         max_col = 0
-
         for coordinate in corners:
             max_row = max(coordinate[0], max_row)
             max_col = max(coordinate[1], max_col)
 
-        self.map = [[EMPTY_CELL_REWARD for col in range(max_row + 1)] for col in range(max_col + 1)]
+        return [[EMPTY_CELL_REWARD for col in range(max_row + 1)] for col in range(max_col + 1)]
 
-    def _update_map(self, state):
-        self._reset_map(state)
+    def _update_rewards(self, state):
+        ''' Update the board with current rewards '''
+
         for wall in api.walls(state):
             self.map[wall[1]][wall[0]] = WALL_REWARD
 
@@ -131,33 +88,130 @@ class MDPAgent(Agent):
         myPos = api.whereAmI(state)
         self.map[myPos[1]][myPos[0]] = NO_MOVE_REWARD
 
-        self._print_map(state)
+    def get_reward(self, row, col):
+        return self.map[row][col]
 
+    def get_utility(self, row, col):
+        return self.utilities[row][col]
 
-    def _print_map(self, state, print_heuristics=True):
-        myPos =  api.whereAmI(state)
+    def is_wall(self, row, col):
+        return self.map[row][col] == WALL_REWARD
+
+    def print_map(self, print_mode = 0):
+        '''
+        print a string representation of the map to the terminal
+        print_mode:
+            0 - human_readable
+            1 - rewards
+            2 - utilities
+
+        '''
         print("---------------MAP---------------")
         for i in reversed(range(len(self.map))):
             for j in range(len(self.map[i])):
-                if (print_heuristics):
-                    if myPos[1] == i and myPos[0] == j:
+                if (print_mode == 1):
+                    if self.pac_man_pos[1] == i and self.pac_man_pos[0] == j:
                         print "P\t",
                     elif self.map[i][j] == WALL_REWARD:
                         print "|\t",
                     else:
                         print str(self.map[i][j]) + "\t",
-                else:
-                    if myPos[1] == i and myPos[0] == j:
-                        print "P",
+                elif (print_mode == 0):
+                    if self.pac_man_pos[1] == i and self.pac_man_pos[0] == j:
+                        print "P\t",
                     elif self.map[i][j] == WALL_REWARD:
-                        print "|",
+                        print "|\t",
                     elif self.map[i][j] == FOOD_REWARD:
-                        print "*",
+                        print "*\t",
                     elif self.map[i][j] == CAPSULE_REWARD:
-                        print "o",
+                        print "o\t",
                     elif self.map[i][j] == GHOST_REWARD:
-                        print "@",
+                        print "@\t",
                     else:
-                        print " ",
+                        print str(round(self.utilities[i][j], 2)) + "\t",
+
+                else:
+                    if self.pac_man_pos[1] == i and self.pac_man_pos[0] == j:
+                        print "P\t",
+                    elif self.is_wall(i, j):
+                        print "|\t",
+                    else:
+                        print str(self.utilities[i][j]) + "\t",
 
             print ""
+
+    def _value_iteration(self, state, discount_factor = 0.5):
+        self.print_map(1)
+        U = [row[:] for row in self.map]
+        U_1 = [row[:] for row in U]
+
+        for i in range(10):
+            U = [row[:] for row in U_1]
+
+            for row in range(len(self.map)):
+                for col in range(len(self.map[0])):
+                    #print(row, col, self.map[row][col])
+                    if self.map[row][col] == EMPTY_CELL_REWARD:
+                        U_1[row][col] = self.map[row][col] + 0.5 * max(self.getEU(U, row, col).values())
+
+        print("Finished value iteration \n\n\n")
+        self.utilities = U_1
+        self.print_map(0)
+
+    def getEU(self, utilities, row, col):
+        deterministic_utilities = {
+            "Stop": utilities[row][col],
+            "North": utilities[row + 1][col] if self.map[row + 1][col] != WALL_REWARD else utilities[row][col],
+            "East": utilities[row][col + 1] if self.map[row][col + 1] != WALL_REWARD else utilities[row][col],
+            "South": utilities[row - 1][col] if self.map[row - 1][col] != WALL_REWARD else utilities[row][col],
+            "West": utilities[row][col - 1] if self.map[row][col - 1] != WALL_REWARD else utilities[row][col],
+        }
+
+        expected_utilities = {
+            "Stop": deterministic_utilities["Stop"],
+            "North": 0.8*deterministic_utilities["North"]+0.1*deterministic_utilities["East"]+0.1*deterministic_utilities["West"],
+            "East": 0.8*deterministic_utilities["East"]+0.1*deterministic_utilities["North"]+0.1*deterministic_utilities["South"],
+            "South": 0.8*deterministic_utilities["South"]+0.1*deterministic_utilities["East"]+0.1*deterministic_utilities["West"],
+            "West": 0.8*deterministic_utilities["West"]+0.1*deterministic_utilities["North"]+0.1*deterministic_utilities["South"],
+        }
+
+        return expected_utilities
+
+
+class MDPAgent(Agent):
+    # Constructor: this gets run when we first invoke pacman.py
+    def __init__(self):
+        print "Starting up MDPAgent!"
+        name = "Pacman"
+
+    # Gets run after an MDPAgent object is created and once there is
+    # game state to access.
+    def registerInitialState(self, state):
+        # CREATE A MAP THAT STORES THE UTILITY OF EACH CELL
+        self.map = MapRepresentation(state)
+
+    # This is what gets run in between multiple games
+    def final(self, state):
+        print "Looks like the game just ended!"
+
+    # For now I just move randomly
+    def getAction(self, state):
+        self.map.update_map(state) # performs value iteration
+
+        # Get the actions we can try
+        legal_moves = api.legalActions(state)
+        print(legal_moves)
+        move = self._determine_best_action(state, legal_moves)
+        # Random choice between the legal options.
+        print("Moving", move)
+        return api.makeMove(move, legal_moves)
+
+    def _determine_best_action(self, state, legal_moves):
+        moves = self.map.getEU(self.map.utilities, api.whereAmI(state)[1], api.whereAmI(state)[0])
+        print("moves", moves)
+
+        return self.arg_max({k: v for k, v in moves.iteritems() if k in legal_moves}
+)
+
+    def arg_max(self, dict):
+        return max(dict, key=dict.get)
