@@ -36,10 +36,10 @@ import game
 import util
 
 import sys
-GHOST_REWARD = -100
-FOOD_REWARD = 10
-CAPSULE_REWARD = 10
-EMPTY_CELL_REWARD = -0.5
+GHOST_REWARD = -1
+FOOD_REWARD = 0.2
+CAPSULE_REWARD = 0.3
+EMPTY_CELL_REWARD = -0.04
 WALL_REWARD = 0
 
 
@@ -105,13 +105,13 @@ class Maze:
         if (self.map[row][col] == MazeEntity.WALL):
             return "na"
         elif (self.map[row][col] == MazeEntity.FOOD):
-            return FOOD_REWARD + self._manhattan_distance_to_closest_ghost(state, row, col)
+            return FOOD_REWARD + self._manhattan_distance_to_closest_ghost(state, row, col)/100
         elif (self.map[row][col] == MazeEntity.CAPSULE):
-            return CAPSULE_REWARD + self._manhattan_distance_to_closest_ghost(state, row, col)
+            return CAPSULE_REWARD + self._manhattan_distance_to_closest_ghost(state, row, col)/100
         elif (self.map[row][col] == MazeEntity.GHOST):
             return GHOST_REWARD
         elif (self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.EMPTY_CELL):
-            return EMPTY_CELL_REWARD #+ self._manhattan_distance_to_closest_ghost(state, row, col)
+            return EMPTY_CELL_REWARD #+ self._manhattan_distance_to_closest_ghost(state, row, col)/100
 
         raise Exception("Oops! Something went wrong")
 
@@ -163,9 +163,16 @@ class Maze:
                     if self.map[row][col] == MazeEntity.EMPTY_CELL or self.map[row][col] == MazeEntity.PACMAN:
                         #print(self.get_reward(row, col))
                         U_1[row][col] = self.get_reward(row, col, state) + 1 * max(self.getEU(U, row, col).values())
+        #self._apply_ghost_sheet(U_1)
         self.utilities = U_1
         #self.print_map(1)
         #self.print_map(0)
+
+    def _apply_ghost_sheet(U):
+        for row in range(len(U)):
+            for col in range(len(U[row])):
+                if self.get_reward(row, col, state) == GHOST_REWARD:
+                    U[row][col] = self.get_reward(row, col, state)
 
     def getEU(self, utilities, row, col):
         deterministic_utilities = {
