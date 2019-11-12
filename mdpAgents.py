@@ -35,11 +35,10 @@ import random
 import game
 import util
 
-import sys
-GHOST_REWARD = -1
+GHOST_REWARD = -0.99
 FOOD_REWARD = 0.2
-CAPSULE_REWARD = 0.3
-EMPTY_CELL_REWARD = -0.04
+CAPSULE_REWARD = 0.2
+EMPTY_CELL_REWARD = -0.03
 WALL_REWARD = 0
 
 
@@ -105,13 +104,13 @@ class Maze:
         if (self.map[row][col] == MazeEntity.WALL):
             return "na"
         elif (self.map[row][col] == MazeEntity.FOOD):
-            return FOOD_REWARD + self._manhattan_distance_to_closest_ghost(state, row, col)/100
+            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < 3 else FOOD_REWARD)
         elif (self.map[row][col] == MazeEntity.CAPSULE):
-            return CAPSULE_REWARD + self._manhattan_distance_to_closest_ghost(state, row, col)/100
+            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < 3 else CAPSULE_REWARD)
         elif (self.map[row][col] == MazeEntity.GHOST):
             return GHOST_REWARD
         elif (self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.EMPTY_CELL):
-            return EMPTY_CELL_REWARD #+ self._manhattan_distance_to_closest_ghost(state, row, col)/100
+            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < 3 else EMPTY_CELL_REWARD)
 
         raise Exception("Oops! Something went wrong")
 
@@ -154,19 +153,23 @@ class Maze:
                 U[row][col] = self.get_reward(row, col, state)
 
         U_1 = [row[:] for row in U]
+        delta = 0.00001
+        max_delta = 9999999
 
-        for i in range(100):
+        while delta < max_delta:
+            max_delta = 0
+            #print(max_delta)
             U = [row[:] for row in U_1]
 
             for row in range(len(self.map)):
                 for col in range(len(self.map[row])):
-                    if self.map[row][col] == MazeEntity.EMPTY_CELL or self.map[row][col] == MazeEntity.PACMAN:
+                    if self.map[row][col] == MazeEntity.EMPTY_CELL or self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.FOOD or self.map[row][col] == MazeEntity.CAPSULE:# or self.map[row][col] == MazeEntity.FOOD:
                         #print(self.get_reward(row, col))
-                        U_1[row][col] = self.get_reward(row, col, state) + 1 * max(self.getEU(U, row, col).values())
+                        U_1[row][col] = self.get_reward(row, col, state) + 0.85 * max(self.getEU(U, row, col).values())
+                        max_delta = max(abs(U_1[row][col]  - U[row][col]), max_delta)
         #self._apply_ghost_sheet(U_1)
         self.utilities = U_1
         #self.print_map(1)
-        #self.print_map(0)
 
     def _apply_ghost_sheet(U):
         for row in range(len(U)):
@@ -198,7 +201,7 @@ class Maze:
 
     	distances = []
     	for i in range(len(theGhosts)):
-    	    distances.append(util.manhattanDistance([row, col],theGhosts[i]))
+    	    distances.append(util.manhattanDistance([row, col],(theGhosts[i][1], theGhosts[i][0])))
 
     	return min(distances)
 
@@ -232,6 +235,7 @@ class MDPAgent(Agent):
 
     def _determine_best_action(self, state, legal_moves):
         moves = self.map.getEU(self.map.utilities, api.whereAmI(state)[1], api.whereAmI(state)[0])
+        #print("moves", str(moves))
 
         return self.arg_max({k: v for k, v in moves.iteritems() if k in legal_moves}
 )
