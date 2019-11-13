@@ -25,7 +25,7 @@
 # Student side autograding was added by Brad Miller, Nick Hay, and
 # Pieter Abbeel (pabbeel@cs.berkeley.edu).
 
-# The agent here is was written by Simon Parsons, based on the code in
+# The agent here is was written by Nicholas Pezzotti, based on the code in
 # pacmanAgents.py
 
 from pacman import Directions
@@ -35,33 +35,122 @@ import random
 import game
 import util
 
-GHOST_REWARD = -0.99
-FOOD_REWARD = 0.2
-CAPSULE_REWARD = 0.2
-EMPTY_CELL_REWARD = -0.03
-WALL_REWARD = 0
+""" These are the parameters that our agent use """
+# These are used in the reward function (Maze > _get_reward(row, col))
+GHOST_REWARD = -1
+FOOD_REWARD = random.uniform(0.05, 0.7)
+CAPSULE_REWARD = FOOD_REWARD
+EMPTY_CELL_REWARD = random.uniform(0.0001, 0.5)
+MIN_DISTANCE_FROM_GHOST = int(random.uniform(2, 6))
+
+# These are used in the value iteration (Maze > _value_iteration(...))
+DEFAULT_GAMMA_VALUE = random.uniform(0.4, 0.99)
+DEFAULT_DELTA_VALUE = 0.00001
+
+
+
+class MDPAgent(Agent):
+    """
+    A Pacman agent that works on a MDP. It is designed for a non-deterministic,
+    fully-observable, dynamic environment.
+
+    ...
+
+    Methods
+    -------
+    getAction(state) : str
+        Given a state, accounting for non-deterministic actions it computes the
+        action that returns the maximum expected utility and returns it.
+    """
+
+    def getAction(self, state):
+        """
+        Given a state, accounting for non-deterministic actions it computes the
+        action that returns the maximum expected utility and returns it.
+
+        Amongst the legal moves, after having performed value iterations, returns
+        the best move.
+        """
+
+        # Get the possible actions
+        legal_moves = api.legalActions(state)
+        move = self._determine_best_action(state, legal_moves)
+
+        #print("Chosen Direction:", move)
+        return api.makeMove(move, legal_moves)
+
+    def _determine_best_action(self, state, legal_moves):
+        """
+        This function handles the logic for querying the map the expected utility of each
+        action and returns the best one.
+        """
+
+        maze = Maze(state)
+        moves = maze.getEU(api.whereAmI(state)[1], api.whereAmI(state)[0])
+        #print("moves", str(moves))
+
+        return self._arg_max({k: v for k, v in moves.iteritems() if k in legal_moves})
+
+    def _arg_max(self, dict):
+        """
+        A simple implementation of argmax. Given a dictionary returns the
+        key which is mapped to the maximum value.
+        """
+
+        return max(dict, key=dict.get)
 
 
 def enum(*sequential, **named):
+    """Template to allow enums in Python2 without using imports"""
+
     enums = dict(zip(sequential, range(len(sequential))), **named)
     return type('Enum', (), enums)
 
 MazeEntity = enum("GHOST", "FOOD", "CAPSULE", "EMPTY_CELL", "WALL", "PACMAN")
 
-
 class Maze:
+    """
+    A class used to represent a model of the maze the agent is navigating
 
+    ...
+
+    Attributes
+    ----------
+    map : [[MazeEntity]]
+        a 2D array that stores what MazeEntity is stored in which cell
+    utilities : [[float]]
+        a 2D array that represents the the utility of each cell on the board
+
+    Methods
+    -------
+    getEU(row, col, utilities=None) : {direction: str -> expectedUtility: float}
+        Returns a dictionary that maps the direction of movement from the
+        location (row, col) and its expectedUtility
+
+        To get the expected utility of a cell rather than resulting from a
+        movement access the field self.utilities directly
+
+    print_map(print_mode = 0)
+        Prints the map to the standard output
+
+        print a string representation of the map to the terminal
+        print_mode:
+            0 - human_readable
+            1 - utilities
+
+    """
     def __init__(self, state):
-        self.map = None
-        self.utilities = None
+        """
+        Initializes the 2D array representing the maze, places the entities in
+        the matrix and performs value iteration on the matrix
+        Parameters
+        ----------
+        state
+            The current state of the board
+        """
 
-        self.update(state)
-
-    def update(self, state):
-        ''' Update the rewards on the map . Called after every move '''
         self.map = self._initialize(state)
         self._fill(state)
-        self.utilities = None
         self._value_iteration(state)
 
     def _initialize(self, state):
@@ -92,7 +181,8 @@ class Maze:
         for capsule in api.capsules(state):
             self.map[capsule[1]][capsule[0]] = MazeEntity.CAPSULE
 
-        # Place ghosts
+        # Place ghosts (This is done after the food and capsules as we don't
+        # care if there is food under a ghost, we will avoid it)
         for ghost in api.ghosts(state):
             self.map[int(ghost[1])][int(ghost[0])] = MazeEntity.GHOST
 
@@ -100,27 +190,110 @@ class Maze:
         myPos = api.whereAmI(state)
         self.map[myPos[1]][myPos[0]] = MazeEntity.PACMAN
 
-    def get_reward(self, row, col, state):
+    def _get_reward(self, row, col, state):
+        """Reward function
+
+            Given a row and col, it returns the reward of that cell.
+            The values are the ones of the constants defined at the top of the file,
+            with the exception of food, capsules and pacman's position which is
+            significantly reduced if he in a predifined distance from any of the
+            ghosts.
+        """
+
         if (self.map[row][col] == MazeEntity.WALL):
             return "na"
         elif (self.map[row][col] == MazeEntity.FOOD):
-            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < 3 else FOOD_REWARD)
+            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < MIN_DISTANCE_FROM_GHOST else FOOD_REWARD)
         elif (self.map[row][col] == MazeEntity.CAPSULE):
-            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < 3 else CAPSULE_REWARD)
+            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < MIN_DISTANCE_FROM_GHOST else CAPSULE_REWARD)
         elif (self.map[row][col] == MazeEntity.GHOST):
             return GHOST_REWARD
         elif (self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.EMPTY_CELL):
-            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < 3 else EMPTY_CELL_REWARD)
+            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < MIN_DISTANCE_FROM_GHOST else EMPTY_CELL_REWARD)
 
         raise Exception("Oops! Something went wrong")
 
+    def _value_iteration(self, state, delta=DEFAULT_DELTA_VALUE, gamma=DEFAULT_GAMMA_VALUE):
+        """ Performs value iteration with Bellman Equation on the maze and stores it in self.utilities.
+
+            Parameters
+            ----------
+            delta
+                The minimum maximum change from one iteration to the next. The
+                larger it is, the quicker it will converge but the less accurate
+                it is.
+            gamma
+                The amount the previous iteration's utility is discounted. The
+                larger the more farsighted our agent will be.
+        """
+
+        U =  [[self._get_reward(row, col, state) for col in range(len(self.map[0]))] for row in range(len(self.map))]
+        U_1 = [row[:] for row in U] # copy
+
+        while True:
+            max_delta = 0
+            U = [row[:] for row in U_1]
+
+            for row in range(len(self.map)):
+                for col in range(len(self.map[row])):
+                    if self.map[row][col] == MazeEntity.EMPTY_CELL or self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.FOOD or self.map[row][col] == MazeEntity.CAPSULE:
+                        # BELLMAN EQUATION
+                        U_1[row][col] = self._get_reward(row, col, state) + gamma * max(self.getEU(row, col, U).values())
+                        max_delta = max(abs(U_1[row][col]  - U[row][col]), max_delta)
+
+            # stop iterating if the smallest delta is larger than our delta value
+            if (delta >= max_delta):
+                break;
+
+        self.utilities = U_1
+        #self.print_map(1)
+
+    def getEU(self, row, col, utilities=None):
+        """Returns a dictionary that maps the direction of movement from the location (row, col) and its expectedUtility.
+
+            To get the expected utility of a cell rather than resulting from a
+            movement access the field self.utilities directly.
+        """
+
+        utilities = self.utilities if utilities == None else utilities
+
+        deterministic_utilities = {
+            "Stop": utilities[row][col],
+            "North": utilities[row + 1][col] if self.map[row + 1][col] != MazeEntity.WALL else utilities[row][col],
+            "East": utilities[row][col + 1] if self.map[row][col + 1] != MazeEntity.WALL else utilities[row][col],
+            "South": utilities[row - 1][col] if self.map[row - 1][col] != MazeEntity.WALL else utilities[row][col],
+            "West": utilities[row][col - 1] if self.map[row][col - 1] != MazeEntity.WALL else utilities[row][col],
+        }
+
+        expected_utilities = {
+            "Stop": deterministic_utilities["Stop"],
+            "North": 0.8*deterministic_utilities["North"]+0.1*deterministic_utilities["East"]+0.1*deterministic_utilities["West"],
+            "East": 0.8*deterministic_utilities["East"]+0.1*deterministic_utilities["North"]+0.1*deterministic_utilities["South"],
+            "South": 0.8*deterministic_utilities["South"]+0.1*deterministic_utilities["East"]+0.1*deterministic_utilities["West"],
+            "West": 0.8*deterministic_utilities["West"]+0.1*deterministic_utilities["North"]+0.1*deterministic_utilities["South"],
+        }
+
+        return expected_utilities
+
+    def _manhattan_distance_to_closest_ghost(self, state, row, col):
+        """Finds the closest distance and finds the manhattan distance to it."""
+
+    	theGhosts = api.ghosts(state)
+
+    	distances = []
+    	for i in range(len(theGhosts)):
+    	    distances.append(util.manhattanDistance([row, col],(theGhosts[i][1], theGhosts[i][0])))
+
+    	return min(distances)
+
     def print_map(self, print_mode = 0):
-        '''
-        print a string representation of the map to the terminal
+        """
+        pretty print a string representation of the map to the terminal
         print_mode:
             0 - human_readable
             1 - utilities
-        '''
+        """""
+
         print("---------------------------------------------MAP---------------------------------------------")
         for i in reversed(range(len(self.map))):
             for j in range(len(self.map[i])):
@@ -144,101 +317,3 @@ class Maze:
                         print (str(round(self.utilities[i][j], 2)) if self.utilities else "?") + "\t",
 
             print ""
-
-    def _value_iteration(self, state):
-        U =  [[0 for i in range(len(self.map[0]))] for j in range(len(self.map))]
-        for row in range(len(U)):
-            for col in range(len(U[row])):
-                #print U[row][col], "TO",
-                U[row][col] = self.get_reward(row, col, state)
-
-        U_1 = [row[:] for row in U]
-        delta = 0.00001
-        max_delta = 9999999
-
-        while delta < max_delta:
-            max_delta = 0
-            #print(max_delta)
-            U = [row[:] for row in U_1]
-
-            for row in range(len(self.map)):
-                for col in range(len(self.map[row])):
-                    if self.map[row][col] == MazeEntity.EMPTY_CELL or self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.FOOD or self.map[row][col] == MazeEntity.CAPSULE:# or self.map[row][col] == MazeEntity.FOOD:
-                        #print(self.get_reward(row, col))
-                        U_1[row][col] = self.get_reward(row, col, state) + 0.85 * max(self.getEU(U, row, col).values())
-                        max_delta = max(abs(U_1[row][col]  - U[row][col]), max_delta)
-        #self._apply_ghost_sheet(U_1)
-        self.utilities = U_1
-        #self.print_map(1)
-
-    def _apply_ghost_sheet(U):
-        for row in range(len(U)):
-            for col in range(len(U[row])):
-                if self.get_reward(row, col, state) == GHOST_REWARD:
-                    U[row][col] = self.get_reward(row, col, state)
-
-    def getEU(self, utilities, row, col):
-        deterministic_utilities = {
-            "Stop": utilities[row][col],
-            "North": utilities[row + 1][col] if self.map[row + 1][col] != MazeEntity.WALL else utilities[row][col],
-            "East": utilities[row][col + 1] if self.map[row][col + 1] != MazeEntity.WALL else utilities[row][col],
-            "South": utilities[row - 1][col] if self.map[row - 1][col] != MazeEntity.WALL else utilities[row][col],
-            "West": utilities[row][col - 1] if self.map[row][col - 1] != MazeEntity.WALL else utilities[row][col],
-        }
-
-        expected_utilities = {
-            "Stop": deterministic_utilities["Stop"],
-            "North": 0.8*deterministic_utilities["North"]+0.1*deterministic_utilities["East"]+0.1*deterministic_utilities["West"],
-            "East": 0.8*deterministic_utilities["East"]+0.1*deterministic_utilities["North"]+0.1*deterministic_utilities["South"],
-            "South": 0.8*deterministic_utilities["South"]+0.1*deterministic_utilities["East"]+0.1*deterministic_utilities["West"],
-            "West": 0.8*deterministic_utilities["West"]+0.1*deterministic_utilities["North"]+0.1*deterministic_utilities["South"],
-        }
-
-        return expected_utilities
-
-    def _manhattan_distance_to_closest_ghost(self, state, row, col):
-    	theGhosts = api.ghosts(state)
-
-    	distances = []
-    	for i in range(len(theGhosts)):
-    	    distances.append(util.manhattanDistance([row, col],(theGhosts[i][1], theGhosts[i][0])))
-
-    	return min(distances)
-
-
-class MDPAgent(Agent):
-    # Constructor: this gets run when we first invoke pacman.py
-    def __init__(self):
-        print "Starting up MDPAgent!"
-        name = "Pacman"
-
-    # Gets run after an MDPAgent object is created and once there is
-    # game state to access.
-    def registerInitialState(self, state):
-        # CREATE A MAP THAT STORES THE UTILITY OF EACH CELL
-        self.map = Maze(state)
-
-    # This is what gets run in between multiple games
-    def final(self, state):
-        print "Looks like the game just ended!"
-
-    # For now I just move randomly
-    def getAction(self, state):
-        self.map.update(state) # performs value iteration
-
-        # Get the actions we can try
-        legal_moves = api.legalActions(state)
-        move = self._determine_best_action(state, legal_moves)
-        # Random choice between the legal options.
-        #print("Chosen Direction:", move)
-        return api.makeMove(move, legal_moves)
-
-    def _determine_best_action(self, state, legal_moves):
-        moves = self.map.getEU(self.map.utilities, api.whereAmI(state)[1], api.whereAmI(state)[0])
-        #print("moves", str(moves))
-
-        return self.arg_max({k: v for k, v in moves.iteritems() if k in legal_moves}
-)
-
-    def arg_max(self, dict):
-        return max(dict, key=dict.get)

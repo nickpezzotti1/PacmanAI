@@ -289,11 +289,11 @@ class ClassicGameRules:
         if state.isLose(): self.lose(state, game)
 
     def win( self, state, game ):
-        if not self.quiet: print "Pacman emerges victorious! Score: %d" % state.data.score
+        #if not self.quiet: print "Pacman emerges victorious! Score: %d" % state.data.score
         game.gameOver = True
 
     def lose( self, state, game ):
-        if not self.quiet: print "Pacman died! Score: %d" % state.data.score
+        #if not self.quiet: print "Pacman died! Score: %d" % state.data.score
         game.gameOver = True
 
     def getProgress(self, game):
@@ -534,6 +534,7 @@ def readCommand( argv ):
 
     # Choose a layout
     args['layout'] = layout.getLayout( options.layout )
+    print options.layout
     if args['layout'] == None: raise Exception("The layout " + options.layout + " cannot be found")
 
     # Choose a Pacman agent
@@ -654,14 +655,17 @@ def runGames( layout, pacman, ghosts, display, numGames, record, numTraining = 0
             cPickle.dump(components, f)
             f.close()
 
+    import mdpAgents
+    print(mdpAgents.GHOST_REWARD, mdpAgents.FOOD_REWARD, mdpAgents.CAPSULE_REWARD, mdpAgents.EMPTY_CELL_REWARD, mdpAgents.MIN_DISTANCE_FROM_GHOST, mdpAgents.DEFAULT_GAMMA_VALUE, mdpAgents.DEFAULT_DELTA_VALUE)
+
     if (numGames-numTraining) > 0:
         scores = [game.state.getScore() for game in games]
         wins = [game.state.isWin() for game in games]
         winRate = wins.count(True)/ float(len(wins))
-        print 'Average Score:', sum(scores) / float(len(scores))
-        print 'Scores:       ', ', '.join([str(score) for score in scores])
-        print 'Win Rate:      %d/%d (%.2f)' % (wins.count(True), len(wins), winRate)
-        print 'Record:       ', ', '.join([ ['Loss', 'Win'][int(w)] for w in wins])
+        #print 'Average Score:', sum(scores) / float(len(scores))
+        #print 'Scores:       ', ', '.join([str(score) for score in scores])
+        print 'Win Rate:      %d/%d (%.2f)\n' % (wins.count(True), len(wins), winRate)
+        #print 'Record:       ', ', '.join([ ['Loss', 'Win'][int(w)] for w in wins])
 
     return games
 
