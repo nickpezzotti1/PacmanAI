@@ -86,19 +86,20 @@ Visit my tutorial website for more: https://morvanzhou.github.io/tutorials/
 import random
 import os
 
-EPOCHS = 4
+EPOCHS = 20
 INITIAL_POPULATION_SIZE = 10
 
 def eval_fitness(genotype):
-    res1 = int(os.popen('python pacman.py --pacman MDPAgent --layout smallClassic -q -a \"food_reward=%s,empty_reward=%s,min_dist=%s,gamma=%s\" -n 10 --timeout'%(genotype[0], genotype[1], genotype[3], genotype[2])).read())
-    return res1
+    res1 = int(os.popen('python pacman.py --pacman MDPAgent --layout smallClassic -q -a \"food_reward=%s,empty_reward=%s,min_dist=%s,gamma=%s\" -n 10'%(genotype[0], genotype[1], genotype[3], genotype[2])).read())
+    res2 = int(os.popen('python pacman.py --pacman MDPAgent --layout mediumClassic -q -a \"food_reward=%s,empty_reward=%s,min_dist=%s,gamma=%s\" -n 2'%(genotype[0], genotype[1], genotype[3], genotype[2])).read())
+    return res1 + res2*5
 
 def initialise(n):
     initial_population = []
     for i in range(n):
         food_reward = round(random.uniform(0, 0.7), 2)
         empty_cell = round(random.uniform(-0.5, 0), 2)
-        gamma = round(random.uniform(0.1, 1), 2)
+        gamma = round(random.uniform(0.1, 0.99), 2)
         min_distance = random.randint(1,3)
 
         initial_population.append((food_reward, empty_cell, gamma, min_distance))
@@ -118,7 +119,37 @@ def crossover(p1, p2):
     return (p1[0], p1[1], p2[2], p2[3])
 
 def mutate(genome):
-    return genome
+    r = random.uniform(0, 1)
+    if r < 0.1:
+        r = random.uniform(0, 1)
+        if r < 0.5:
+            r -= 0.1
+        else:
+            r +=  0.1
+
+    r = random.uniform(0, 1)
+    if r < 0.1:
+        r = random.uniform(0, 1)
+        if r < 0.5:
+            r -= 0.1
+        else:
+            r +=  0.1
+
+    r = random.uniform(0, 1)
+    if r < 0.1:
+        r = random.uniform(0, 1)
+        if r < 0.5:
+            r -= 0.1
+        else:
+            r +=  0.1
+
+    r = random.uniform(0, 1)
+    if r < 0.01:
+        r = random.uniform(0, 1)
+        if r < 0.5:
+            r -= 1
+        else:
+            r += 1
 
 def reproduce(chromosomes, n):
     res = []
