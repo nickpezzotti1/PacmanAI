@@ -38,13 +38,13 @@ import util
 """ These are the parameters that our agent use """
 # These are used in the reward function (Maze > _get_reward(row, col))
 GHOST_REWARD = -1
-FOOD_REWARD = random.uniform(0.05, 0.7)
+FOOD_REWARD = 0.66 #random.uniform(0.05, 0.7)
 CAPSULE_REWARD = FOOD_REWARD
-EMPTY_CELL_REWARD = random.uniform(0.0001, 0.5)
-MIN_DISTANCE_FROM_GHOST = int(random.uniform(2, 6))
+EMPTY_CELL_REWARD = -0.3 #random.uniform(0.0001, 0.5)
+MIN_DISTANCE_FROM_GHOST = 3#int(random.uniform(2, 6))
 
 # These are used in the value iteration (Maze > _value_iteration(...))
-DEFAULT_GAMMA_VALUE = random.uniform(0.4, 0.99)
+DEFAULT_GAMMA_VALUE = 0.85 #random.uniform(0.4, 0.99)
 DEFAULT_DELTA_VALUE = 0.00001
 
 
@@ -139,6 +139,7 @@ class Maze:
             1 - utilities
 
     """
+
     def __init__(self, state):
         """
         Initializes the 2D array representing the maze, places the entities in
@@ -151,6 +152,7 @@ class Maze:
 
         self.map = self._initialize(state)
         self._fill(state)
+        self.distances = self._precompute_distances(state)
         self._value_iteration(state)
 
     def _initialize(self, state):
@@ -278,13 +280,31 @@ class Maze:
     def _manhattan_distance_to_closest_ghost(self, state, row, col):
         """Finds the closest distance and finds the manhattan distance to it."""
 
-    	theGhosts = api.ghosts(state)
+    	return self.distances[row][col]
 
-    	distances = []
-    	for i in range(len(theGhosts)):
-    	    distances.append(util.manhattanDistance([row, col],(theGhosts[i][1], theGhosts[i][0])))
+    def _precompute_distances(self, state):
+        theGhosts = api.ghosts(state)
 
-    	return min(distances)
+        distances = [[float("inf") for col in range(len(self.map[0]))] for row in range(len(self.map))]
+
+        theGhosts = api.ghosts(state)
+        for ghost in theGhosts:
+            self._flood_fill(distances, int(ghost[1]), int(ghost[0]), 0)
+
+        return distances
+
+    def _flood_fill(self, distances, row, col, val):
+        if row < 0 or row >= len(self.map) or col < 0 or col >= len(self.map[row]) or (distances[row][col] != -1 and val >= distances[row][col]) or self.map[row][col] == MazeEntity.WALL or val > MIN_DISTANCE_FROM_GHOST:
+            return
+
+        distances[row][col] = val
+
+        val = val + 1
+        self._flood_fill(distances, row, col + 1, val)
+        self._flood_fill(distances, row, col - 1, val)
+        self._flood_fill(distances, row + 1, col, val)
+        self._flood_fill(distances, row - 1, col, val)
+
 
     def print_map(self, print_mode = 0):
         """
