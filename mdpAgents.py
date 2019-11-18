@@ -34,7 +34,10 @@ import api
 import random
 import game
 import util
+<<<<<<< HEAD
 import math
+=======
+>>>>>>> 8759b9f79a4b2a84d29821031615456f14dcdcc3
 
 class MDPAgent(Agent):
     """
