@@ -36,20 +36,6 @@ import game
 import util
 import math
 
-""" These are the parameters that our agent use """
-# These are used in the reward function (Maze > _get_reward(row, col))
-GHOST_REWARD = -1
-FOOD_REWARD = 0.3 #random.uniform(0.05, 0.7)
-CAPSULE_REWARD = FOOD_REWARD
-EMPTY_CELL_REWARD = -0.03 #random.uniform(0.0001, 0.5)
-MIN_DISTANCE_FROM_GHOST = 0#int(random.uniform(2, 6))
-
-# These are used in the value iteration (Maze > _value_iteration(...))
-DEFAULT_GAMMA_VALUE = 0.85 #random.uniform(0.4, 0.99)
-DEFAULT_DELTA_VALUE = 0.00001
-
-
-
 class MDPAgent(Agent):
     """
     A Pacman agent that works on a MDP. It is designed for a non-deterministic,
@@ -63,6 +49,23 @@ class MDPAgent(Agent):
         Given a state, accounting for non-deterministic actions it computes the
         action that returns the maximum expected utility and returns it.
     """
+
+    def __init__(self, food_reward, empty_reward, min_dist, gamma=0):
+
+        """ These are the parameters that our agent use """
+        # These are used in the reward function (Maze > _get_reward(row, col))
+        self.FOOD_REWARD = float(food_reward)
+        self.EMPTY_CELL_REWARD = float(empty_reward)
+        self.MIN_DISTANCE_FROM_GHOST = int(min_dist)
+
+        self.GHOST_REWARD = -1
+        self.CAPSULE_REWARD = self.FOOD_REWARD
+
+        # These are used in the value iteration (Maze > _value_iteration(...))
+        self.DEFAULT_DELTA_VALUE = 0.00001
+        self.DEFAULT_GAMMA_VALUE = float(gamma)
+
+        name = "Pacman"
 
     def getAction(self, state):
         """
@@ -86,7 +89,7 @@ class MDPAgent(Agent):
         action and returns the best one.
         """
 
-        maze = Maze(state)
+        maze = Maze(state, self.DEFAULT_DELTA_VALUE, self.DEFAULT_GAMMA_VALUE, self.MIN_DISTANCE_FROM_GHOST, self.FOOD_REWARD, self.GHOST_REWARD, self.CAPSULE_REWARD, self.EMPTY_CELL_REWARD)
         moves = maze.getEU(api.whereAmI(state)[1], api.whereAmI(state)[0])
         #print("moves", str(moves))
 
@@ -140,8 +143,7 @@ class Maze:
             1 - utilities
 
     """
-
-    def __init__(self, state):
+    def __init__(self, state, delta, gamma, min_distance_from_ghosts, food, ghost, caps, empty):
         """
         Initializes the 2D array representing the maze, places the entities in
         the matrix and performs value iteration on the matrix
@@ -151,11 +153,17 @@ class Maze:
             The current state of the board
         """
 
+        self.DEFAULT_DELTA_VALUE = delta
+        self.DEFAULT_GAMMA_VALUE = gamma
+        self.FOOD_REWARD = food
+        self.GHOST_REWARD = ghost
+        self.CAPSULE_REWARD = caps
+        self.EMPTY_CELL_REWARD = empty
+
         self.map = self._initialize(state)
         self._fill(state)
+        self.MIN_DISTANCE_FROM_GHOST = int(math.log(3 * max(len(self.map), len(self.map[0])))/math.log(3)) + 1
         self.distances = self._precompute_distances(state)
-        global MIN_DISTANCE_FROM_GHOST
-        MIN_DISTANCE_FROM_GHOST = int(math.log(3 * max(len(self.map), len(self.map[0])))/math.log(3)) + 1
         self._value_iteration(state)
 
 
@@ -209,17 +217,17 @@ class Maze:
         if (self.map[row][col] == MazeEntity.WALL):
             return "na"
         elif (self.map[row][col] == MazeEntity.FOOD):
-            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < MIN_DISTANCE_FROM_GHOST else FOOD_REWARD)
+            return ((self.GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < self.MIN_DISTANCE_FROM_GHOST else self.FOOD_REWARD)
         elif (self.map[row][col] == MazeEntity.CAPSULE):
-            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < MIN_DISTANCE_FROM_GHOST else CAPSULE_REWARD)
+            return ((self.GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < self.MIN_DISTANCE_FROM_GHOST else self.CAPSULE_REWARD)
         elif (self.map[row][col] == MazeEntity.GHOST):
-            return GHOST_REWARD
+            return self.GHOST_REWARD
         elif (self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.EMPTY_CELL):
-            return ((GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < MIN_DISTANCE_FROM_GHOST else EMPTY_CELL_REWARD)
+            return ((self.GHOST_REWARD / self._manhattan_distance_to_closest_ghost(state, row, col)) if self._manhattan_distance_to_closest_ghost(state, row, col) < self.MIN_DISTANCE_FROM_GHOST else self.EMPTY_CELL_REWARD)
 
         raise Exception("Oops! Something went wrong")
 
-    def _value_iteration(self, state, delta=DEFAULT_DELTA_VALUE, gamma=DEFAULT_GAMMA_VALUE):
+    def _value_iteration(self, state, delta=-1, gamma=-1):
         """ Performs value iteration with Bellman Equation on the maze and stores it in self.utilities.
 
             Parameters
@@ -233,6 +241,12 @@ class Maze:
                 larger the more farsighted our agent will be.
         """
 
+        if delta == -1:
+            delta = self.DEFAULT_DELTA_VALUE
+
+        if gamma == -1:
+            gamma = self.DEFAULT_GAMMA_VALUE
+
         U =  [[self._get_reward(row, col, state) for col in range(len(self.map[0]))] for row in range(len(self.map))]
         U_1 = [row[:] for row in U] # copy
 
@@ -244,7 +258,7 @@ class Maze:
                 for col in range(len(self.map[row])):
                     if self.map[row][col] == MazeEntity.EMPTY_CELL or self.map[row][col] == MazeEntity.PACMAN or self.map[row][col] == MazeEntity.FOOD or self.map[row][col] == MazeEntity.CAPSULE:
                         # BELLMAN EQUATION
-                        U_1[row][col] = self._get_reward(row, col, state) + gamma * max(self.getEU(row, col, U).values())
+                        U_1[row][col] = self._get_reward(row, col, state) + float(gamma) * max(self.getEU(row, col, U).values())
                         max_delta = max(abs(U_1[row][col]  - U[row][col]), max_delta)
 
             # stop iterating if the smallest delta is larger than our delta value
@@ -298,7 +312,7 @@ class Maze:
         return distances
 
     def _flood_fill(self, distances, row, col, val):
-        if row < 0 or row >= len(self.map) or col < 0 or col >= len(self.map[row]) or (distances[row][col] != -1 and val >= distances[row][col]) or self.map[row][col] == MazeEntity.WALL or val > MIN_DISTANCE_FROM_GHOST:
+        if row < 0 or row >= len(self.map) or col < 0 or col >= len(self.map[row]) or (distances[row][col] != -1 and val >= distances[row][col]) or self.map[row][col] == MazeEntity.WALL or val > self.MIN_DISTANCE_FROM_GHOST:
             return
 
         distances[row][col] = val

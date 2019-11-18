@@ -534,7 +534,6 @@ def readCommand( argv ):
 
     # Choose a layout
     args['layout'] = layout.getLayout( options.layout )
-    print options.layout
     if args['layout'] == None: raise Exception("The layout " + options.layout + " cannot be found")
 
     # Choose a Pacman agent
@@ -655,8 +654,7 @@ def runGames( layout, pacman, ghosts, display, numGames, record, numTraining = 0
             cPickle.dump(components, f)
             f.close()
 
-    import mdpAgents
-    print(mdpAgents.GHOST_REWARD, mdpAgents.FOOD_REWARD, mdpAgents.CAPSULE_REWARD, mdpAgents.EMPTY_CELL_REWARD, mdpAgents.MIN_DISTANCE_FROM_GHOST, mdpAgents.DEFAULT_GAMMA_VALUE, mdpAgents.DEFAULT_DELTA_VALUE)
+    #print(pacman.GHOST_REWARD, pacman.FOOD_REWARD, pacman.CAPSULE_REWARD, pacman.EMPTY_CELL_REWARD, pacman.MIN_DISTANCE_FROM_GHOST, pacman.DEFAULT_GAMMA_VALUE, pacman.DEFAULT_DELTA_VALUE)
 
     if (numGames-numTraining) > 0:
         scores = [game.state.getScore() for game in games]
@@ -664,7 +662,7 @@ def runGames( layout, pacman, ghosts, display, numGames, record, numTraining = 0
         winRate = wins.count(True)/ float(len(wins))
         #print 'Average Score:', sum(scores) / float(len(scores))
         #print 'Scores:       ', ', '.join([str(score) for score in scores])
-        print 'Win Rate:      %d/%d (%.2f)\n' % (wins.count(True), len(wins), winRate)
+        print wins.count(True)
         #print 'Record:       ', ', '.join([ ['Loss', 'Win'][int(w)] for w in wins])
 
     return games
