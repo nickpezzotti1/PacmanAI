@@ -34,14 +34,15 @@ import api
 import random
 import game
 import util
+import math
 
 """ These are the parameters that our agent use """
 # These are used in the reward function (Maze > _get_reward(row, col))
 GHOST_REWARD = -1
-FOOD_REWARD = 0.66 #random.uniform(0.05, 0.7)
+FOOD_REWARD = 0.3 #random.uniform(0.05, 0.7)
 CAPSULE_REWARD = FOOD_REWARD
-EMPTY_CELL_REWARD = -0.3 #random.uniform(0.0001, 0.5)
-MIN_DISTANCE_FROM_GHOST = 3#int(random.uniform(2, 6))
+EMPTY_CELL_REWARD = -0.03 #random.uniform(0.0001, 0.5)
+MIN_DISTANCE_FROM_GHOST = 0#int(random.uniform(2, 6))
 
 # These are used in the value iteration (Maze > _value_iteration(...))
 DEFAULT_GAMMA_VALUE = 0.85 #random.uniform(0.4, 0.99)
@@ -153,7 +154,10 @@ class Maze:
         self.map = self._initialize(state)
         self._fill(state)
         self.distances = self._precompute_distances(state)
+        global MIN_DISTANCE_FROM_GHOST
+        MIN_DISTANCE_FROM_GHOST = int(math.log(3 * max(len(self.map), len(self.map[0])))/math.log(3)) + 1
         self._value_iteration(state)
+
 
     def _initialize(self, state):
         ''' Generate an empty 2D-matrix representing the array '''
