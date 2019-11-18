@@ -89,5 +89,4 @@ for i in range(EPOCHS):
     print "chromosomes", chromosomes
     print "pool score:", sum(chromosomes.values())
     population = reproduce(chromosomes, len(population))
-    print "Updating population to", population
     print " "
