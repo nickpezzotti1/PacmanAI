@@ -2,7 +2,7 @@ import random
 import os
 
 EPOCHS = 20
-INITIAL_POPULATION_SIZE = 100
+INITIAL_POPULATION_SIZE = 50
 
 def eval_fitness(genotype):
     res1 = int(os.popen('python pacman.py --pacman MDPAgent --layout smallGrid -q -a \"food_reward=%s,empty_reward=%s,min_dist=%s,gamma=%s\" -n 5'%(genotype[0], genotype[1], genotype[3], genotype[2])).read())
@@ -72,7 +72,7 @@ def mutate(genome):
 
 def reproduce(chromosomes, n):
     res = []
-    for i in range(n + 1):
+    for i in range(n):
         p1 = weighted_random_choice(chromosomes)
         p2 = weighted_random_choice(chromosomes)
 
