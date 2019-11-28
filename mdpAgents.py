@@ -37,15 +37,13 @@ import util
 import math
 
 """ These are the parameters that our agent use """
-# These are used in the reward function (Maze > _get_reward(row, col))
 GHOST_REWARD = -1
-FOOD_REWARD = 0.3 #random.uniform(0.05, 0.7)
+FOOD_REWARD = 0.2
 CAPSULE_REWARD = FOOD_REWARD
-EMPTY_CELL_REWARD = -0.03 #random.uniform(0.0001, 0.5)
-MIN_DISTANCE_FROM_GHOST = 0#int(random.uniform(2, 6))
+EMPTY_CELL_REWARD = -0.03
+MIN_DISTANCE_FROM_GHOST = 0 # this will be set proportional to the map size
 
-# These are used in the value iteration (Maze > _value_iteration(...))
-DEFAULT_GAMMA_VALUE = 0.85 #random.uniform(0.4, 0.99)
+DEFAULT_GAMMA_VALUE = 0.85
 DEFAULT_DELTA_VALUE = 0.00001
 
 
@@ -252,7 +250,6 @@ class Maze:
                 break;
 
         self.utilities = U_1
-        #self.print_map(1)
 
     def getEU(self, row, col, utilities=None):
         """Returns a dictionary that maps the direction of movement from the location (row, col) and its expectedUtility.
@@ -287,6 +284,7 @@ class Maze:
     	return self.distances[row][col]
 
     def _precompute_distances(self, state):
+        """ Precomputes the distance of each cell to that of the closest ghost """
         theGhosts = api.ghosts(state)
 
         distances = [[float("inf") for col in range(len(self.map[0]))] for row in range(len(self.map))]
@@ -298,6 +296,8 @@ class Maze:
         return distances
 
     def _flood_fill(self, distances, row, col, val):
+        """ The variation of the floodfill algorithm. This computes the distance to the closest ghost, stopping at a given threshold k """
+
         if row < 0 or row >= len(self.map) or col < 0 or col >= len(self.map[row]) or (distances[row][col] != -1 and val >= distances[row][col]) or self.map[row][col] == MazeEntity.WALL or val > MIN_DISTANCE_FROM_GHOST:
             return
 
